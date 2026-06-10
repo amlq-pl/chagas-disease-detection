@@ -1,0 +1,38 @@
+\documentclass[a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage[polish]{babel}
+\usepackage[margin=1in]{geometry}
+\usepackage{parskip}
+
+\usepackage{amsmath,amsfonts,amssymb,amsthm}
+
+\usepackage[dvipsnames]{xcolor}
+\usepackage{float}
+\usepackage{tikz}
+\usepackage{import}
+
+\usepackage[colorlinks=true,linkcolor=black,urlcolor=blue]{hyperref}
+\usepackage{authoraftertitle}
+\usepackage{fancyhdr,lastpage}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\MyAuthor}
+\fancyhead[L]{\MyTitle}
+\fancyfoot[R]{Strona \thepage/\pageref{LastPage}}
+\renewcommand{\headrulewidth}{1pt}
+\renewcommand{\headruleskip}{2pt}
+\setlength{\headheight}{14pt}
+\renewcommand{\footrulewidth}{1pt}
+\renewcommand{\labelenumi}{\alph{enumi})}
+\newcommand{\Expval}[1]{\mathbb{E} \left[ #1 \right]}
+\newtheorem{thm}{Twierdzenie}
+\newtheorem{lemma}[thm]{Lemat}
+
+\author{Jakub Janór, Szymon Gaczoł}
+\title{MPUM - projekt}
+
+\begin{document}
+\input{01-Wprowadzenie/main1.tex}
+
+\end{document}
