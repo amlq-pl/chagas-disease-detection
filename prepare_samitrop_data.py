@@ -8,15 +8,11 @@ Jeśli jakiś sygnał jest krótszy niż 7s, pomijamy go.
 
 Z każdego recordu wycinamy 7-sekundowe okno. Jeśli początkowa długość to 10 sekund - losujemy.
 
-Zapisujemy 3 macierze EKG w cięstotliwościach:
+Zapisujemy 3 macierze EKG w częstotliwościach:
 - 100 po resamplingu
 - 250 po resamplingu
 - 400, oryginalne
-Dodatkowo: macierz etykiet (same jedynki) i macierz metadanych [płeć, wiek, >90] - taki sam
-format jak w PTB-XL (płeć: 0 = mężczyzna, 1 = kobieta; wiek >=90 -> 89 + flaga 1).
-
-A propos metadanych - stąd będziemy wyciągać jeszcze death i timey najpewniej, ale to na kolejnym
-etapie developmentu.
+Dodatkowo: macierz etykiet (same jedynki) i macierz metadanych [płeć, wiek, normal_ecg].
 
 Układ macierzy EKG: (N, 12, L)
 N - liczba recordów
@@ -92,17 +88,9 @@ def is_valid(sig):
     return bool(np.all(np.isfinite(sig))) and float(sig.std()) >= 1e-6
 
 
-# Zbudowanie wiersza metadanych [płeć, wiek, >90] dla recordu
-# Analogicznie do PTB-XL
-def build_metadata_row(age, is_male):
-    sex = 0.0 if bool(is_male) else 1.0
-    age = float(age)
-    if age >= 90:
-        age = 89.0
-        over_90 = 1.0
-    else:
-        over_90 = 0.0
-    return [sex, age, over_90]
+# Zbudowanie wiersza metadanych [płeć, wiek, normal_ecg] dla recordu
+def build_metadata_row(is_male, age, normal_ecg):
+    return [float(is_male), float(age), float(normal_ecg)]
 
 
 # Główna procedura: czyta metadane i sygnały z HDF5, dla każdego rekordu obcina zera,
@@ -117,7 +105,8 @@ def run(args):
 
     # Metadane w kolejności z CSV. Parujemy po pozycji: i-ty wiersz CSV odpowiada tracings[i]
     df = pd.read_csv(csv_path)
-    csv_rows = [(int(r['exam_id']), r['age'], r['is_male']) for _, r in df.iterrows()]
+    csv_rows = [(int(r['exam_id']), r['age'], r['is_male'], r['normal_ecg'])
+                for _, r in df.iterrows()]
 
     # Długości okna w próbkach dla każdej częstotliwości
     len_100 = WINDOW_S * 100
@@ -136,7 +125,7 @@ def run(args):
 
         for i in range(n_total):
             # i-ty wiersz CSV <-> tracings[i].
-            exam_id, age, is_male = csv_rows[i]
+            exam_id, age, is_male, normal_ecg = csv_rows[i]
 
             sig = np.asarray(tracings[i], dtype=np.float32)   # (próbki, 12), 400 Hz, mV
             sig = strip_zero_padding(sig)                     # usuń padding zerowy
@@ -161,7 +150,7 @@ def run(args):
             ecg_400.append(sig400[:len_400].T)
             ecg_250.append(sig250[:len_250].T)
             ecg_100.append(sig100[:len_100].T)
-            metadata.append(build_metadata_row(age, is_male))
+            metadata.append(build_metadata_row(is_male, age, normal_ecg))
             exam_ids.append(exam_id)
 
             if len(exam_ids) % 250 == 0:
@@ -174,7 +163,7 @@ def run(args):
     ecg_250 = np.stack(ecg_250).astype(np.float32)
     ecg_400 = np.stack(ecg_400).astype(np.float32)
     labels = np.ones((n,), dtype=np.int64)             # wszyscy chorzy -> 1
-    metadata = np.asarray(metadata, dtype=np.float32)  # [płeć, wiek, >90]
+    metadata = np.asarray(metadata, dtype=np.float32)  # [płeć, wiek, normal_ecg]
     exam_ids = np.asarray(exam_ids, dtype=np.int64)
 
     # Zapis wyników
