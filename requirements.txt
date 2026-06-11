@@ -9,3 +9,7 @@ matplotlib>=3.4
 scikit-learn>=1.1
 torch>=2.4
 torchmetrics>=1.4
+tqdm>=4.66
+
+# Dev tools
+black>=24.0
