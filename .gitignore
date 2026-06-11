@@ -1,0 +1,12 @@
+ptbxl-data
+processed-data
+samitrop-data
+semi-processed-data
+.venv
+.vscode
+raport/main.aux
+raport/main.fdb_latexmk
+raport/main.fls
+raport/main.log
+raport/main.out
+raport/main.synctex.gz

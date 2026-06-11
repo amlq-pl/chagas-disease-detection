@@ -1,4 +1,15 @@
+# Wheels CUDA dla PyTorch - dla CPU-only zakomentuj poniższą linię
+--extra-index-url https://download.pytorch.org/whl/cu124
+
 numpy>=1.21
 pandas>=1.3
 scipy>=1.7
 h5py>=3.0
+matplotlib>=3.4
+scikit-learn>=1.1
+torch>=2.4
+torchmetrics>=1.4
+tqdm>=4.66
+
+# Dev tools
+black>=24.0
