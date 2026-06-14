@@ -2,6 +2,7 @@ ptbxl-data
 processed-data
 samitrop-data
 semi-processed-data
+code15-data
 .venv
 .vscode
 raport/main.aux

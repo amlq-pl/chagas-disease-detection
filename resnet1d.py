@@ -114,9 +114,9 @@ class ResNet18(torch.nn.Module):
 
 if __name__ == "__main__":
     NUM_EPOCHS = 30
-    BATCH_SIZE = 64  # 2.5x dłuższe sygnały niż przy 100 Hz, więc mniejszy batch
+    BATCH_SIZE = 64
     NUM_WORKERS = 4
-    SUBSET_FRACTION = 1.0  # 1.0 = pełny zbiór; ustaw mniej dla szybkiego sanity check
+    SUBSET_FRACTION = 1.0
     EARLY_STOPPING_PATIENCE = 5
     DIRPATH = "processed-data"
     FILEPATH = DIRPATH + "/" + "ecg_merged_100hz_resampled.npy"
@@ -124,14 +124,12 @@ if __name__ == "__main__":
     METADATA = DIRPATH + "/" + "metadata_merged.npy"
     CHECKPOINT = "best_resnet1d.pt"
 
-    # Datasety przez mmap - nie ładujemy całego pliku do RAM
     train_ds, val_ds, test_ds, y_train, y_val, y_test = make_mmap_datasets(
         FILEPATH, LABELS, metadata_path=METADATA, subset_fraction=SUBSET_FRACTION, seed=42
     )
     print(f"Train: {len(train_ds)} | Val: {len(val_ds)} | Test: {len(test_ds)}")
     print(f"Pozytywnych w train: {int(y_train.sum())} / {len(y_train)}")
 
-    # Podgląd pierwszego przykładu (też przez mmap)
     example_x, _, _ = train_ds[0]
     plot_sample_ecg(example_x.numpy())
 
@@ -169,11 +167,8 @@ if __name__ == "__main__":
         persistent_workers=True,
     )
 
-    # Parametry do treningu
     lr = 0.0001
-    weight_decay = (
-        1e-3  # silniejsza regularyzacja L2 niż domyślny AdamW=0.01 - opcja walki z overfittem
-    )
+    weight_decay = 1e-3
     criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = torch.optim.AdamW(compiled_model.parameters(), lr=lr, weight_decay=weight_decay)
 
