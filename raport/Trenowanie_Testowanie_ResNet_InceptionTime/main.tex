@@ -1,14 +1,15 @@
 \section{Trening i wyniki dla sieci ResNet18 oraz InceptionTime}
-Trenowanie sieci ResNet18 oraz InceptionTime zostało przeprowadzone na zbiorze Code-15 + SamiTrop, gdzie proporcje
+Trenowanie sieci ResNet18 oraz InceptionTime zostało przeprowadzone na zbiorze CODE-15\% + SaMi-Trop, gdzie proporcje
 podziału na zbiór treningowy, walidacyjny oraz testowy wynosiły odpowiednio 70\%, 15\% oraz 15\%.
-Dla obydwu modeli wykorzystaliśmy tą samą funkcję straty, czyli binary cross-entropy, ale ze zmodyfikowaną wagą dla
+Dla obydwu modeli wykorzystaliśmy tę samą funkcję straty, czyli binary cross-entropy, ale ze zmodyfikowaną wagą dla
 pozytywnych etykiet, która została ustawiona na stosunek liczby negatywnych etykiet do liczby pozytywnych etykiet w zbiorze treningowym.
 Zrobiliśmy tak, aby poradzić sobie z problemem niezbalansowania etykiet w naszym zbiorze danych (pozytywne etykiety stanowią tylko około 2\% wszystkich).
-Ponadto wykorzystaliśmy optymalizator Adam z wartością współczynnika uczenia się równą $10^{-4}$ oraz weight\_decay równym $10^{-3}$.
+Ponadto wykorzystaliśmy optymalizator AdamW z wartością współczynnika uczenia się równą $10^{-4}$ oraz weight\_decay równym $10^{-3}$.
 Dodatkowo dla każdego z modeli przeprowadziliśmy eksperymenty z wykorzystaniem metadanych (znormalizowany wiek, płeć oraz wskaźnik, czy EKG
-zostało określone w zbiorze jako poprawne) oraz z wykorzystaniem augmentacji danych (w 20 \% przypadków wyzerowany jeden kanał EKG, a w 50\% przypadków dodany szum
-gaussowski z odchyleniem równym 0.05). Każdy z modeli był trenowany przez 25 epok, z uwzględnieniem wczesnego zatrzymania, jeśli przez 5 kolejnych epok nie zwiększała
-się wartość AUPRC na zbiorze walidacyjnym. Następnie każdy z modeli był testowany na zbiorze testowym, czego wyniki można zobaczyć w Tabeli \ref{tab:resnet_inception_results}.
+zostało określone w zbiorze jako poprawne) oraz z wykorzystaniem augmentacji danych (w 20\% przypadków wyzerowany jeden kanał EKG, a w 50\% przypadków dodany szum
+gaussowski z odchyleniem równym 0.05). Każdy z modeli bez augmentacji był trenowany przez maksymalnie 25 epok
+z mechanizmem wczesnego zatrzymania, jeśli przez 5 kolejnych epok nie zwiększała się wartość AUPRC na zbiorze walidacyjnym; dla wariantów z augmentacją limit
+epok wynosił 45, a patience 10 (ze względu na wolniejszą zbieżność). Następnie każdy z modeli był testowany na zbiorze testowym, czego wyniki można zobaczyć w Tabeli \ref{tab:resnet_inception_results}.
 \begin{table}[H]
   \centering
   \begin{tabular}{lrrrrl}
@@ -26,17 +27,17 @@ się wartość AUPRC na zbiorze walidacyjnym. Następnie każdy z modeli był te
   \caption{Wyniki treningu i testu dla sieci ResNet18 oraz InceptionTime.}
   \label{tab:resnet_inception_results}
 \end{table}
-Na Rysunku \ref{fig:pr_curves} widać krzywe uczenia dla poszczególnych modeli.
-Należy ponadto zauważyć, że żaden z modeli nie był trenowany przez całe 25 epok, bo wcześniej
+Na Rysunku \ref{fig:learning_curves} widać krzywe uczenia dla poszczególnych modeli.
+Należy ponadto zauważyć, że żaden z modeli nie był trenowany przez cały zadany limit epok, bo wcześniej
 został zatrzymany przez mechanizm wczesnego zatrzymania.
 
 \begin{figure}[H]
   \centering
   \includegraphics[width=0.8\textwidth]{Trenowanie_Testowanie_ResNet_InceptionTime/models.png}
-  \caption{Krzywe Precision-Recall dla sieci ResNet18 oraz InceptionTime.}
-  \label{fig:pr_curves}
+  \caption{Krzywe uczenia dla sieci ResNet18 oraz InceptionTime.}
+  \label{fig:learning_curves}
 \end{figure}
-Z Tabeli \ref{tab:resnet_inception_results} oraz Rysunku \ref{fig:pr_curves} widać, że najlepsze wyniki
+Z Tabeli \ref{tab:resnet_inception_results} oraz Rysunku \ref{fig:learning_curves} widać, że najlepsze wyniki
 osiągnęły sieci InceptionTime, oraz przede wszystkim, że były one dużo bardziej odporne na przetrenowanie
 niż sieci ResNet18. Wynika to najprawdopodobniej z faktu, że
 architektura InceptionTime posiada mniej parametrów niż architektura ResNet18, co przy bardzo małej liczbie
@@ -45,8 +46,8 @@ Ostatecznie należy zauważyć, że najlepszy wynik osiągnęła sieć Inception
 bez metadanych i augmentacji. Dodanie metadanych mogło zaburzyć proces uczenia,
 zwłaszcza, że było ich bardzo mało, i najprawdopodobniej nie są one skorelowane
 z występowaniem choroby Chagasa. Natomiast dodanie augmentacji danych mogło
-spowodować zbyt duże zaburzenie danych wejściowych. Wydaje mi się, że to co mogłem zrobić
-lepiej w tym przypadku, to zamiast modyfikować dane wejściowe, mógłbym dodać nowe dane
+spowodować zbyt duże zaburzenie danych wejściowych. Wydaje nam się, że to co mogliśmy zrobić
+lepiej w tym przypadku, to zamiast modyfikować dane wejściowe, moglibyśmy dodać nowe dane
 z wykorzystaniem augmentacji, które byłyby modyfikacją danych już obecnych. Mogłoby to pozwolić na lepsze uogólnienie
 przy braku utraty informacji.
 \\
@@ -78,7 +79,7 @@ seedów tego ensemblingu.
   \caption{Krzywe uczenia dla poszczególnych seedów ensemblingu.}
   \label{fig:ensemble_learning_curves}
 \end{figure}
-Zauważmy, że wyniki ensemblingu są lepsze niż wyniki poszczególnych seedów o 0.015 w AUPRC, co jest
+Zauważmy, że wyniki ensemblingu są lepsze niż średnia wyników poszczególnych seedów (około 0.165 AUPRC) o blisko 0.02 w AUPRC, co jest
 znaczącą poprawą. Zinterpretujmy teraz wyniki całego ensemblingu. Nasz ensembling osiągnął
 wynik 0.184 w AUPRC, co przy procencie pozytywnych etykiet 0.024 oznacza, że model przewiduje
 pozytywne etykiety 7.67 razy lepiej niż losowy klasyfikator.
