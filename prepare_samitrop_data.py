@@ -8,10 +8,7 @@ Jeśli jakiś sygnał jest krótszy niż 7s, pomijamy go.
 
 Z każdego recordu wycinamy 7-sekundowe okno. Jeśli początkowa długość to 10 sekund - losujemy.
 
-Zapisujemy 3 macierze EKG w częstotliwościach:
-- 100 po resamplingu
-- 250 po resamplingu
-- 400, oryginalne
+Zapisujemy macierz EKG w częstotliwości 100 Hz.
 Dodatkowo: macierz etykiet (same jedynki) i macierz metadanych [płeć, wiek, normal_ecg].
 
 Układ macierzy EKG: (N, 12, L)
@@ -38,6 +35,7 @@ from scipy.signal import resample_poly
 SIGNAL_HDF5 = 'exams.hdf5'        # gotowa macierz sygnałów
 DEMOGRAPHICS_CSV = 'exams.csv'    # metadane (exam_id, age, is_male)
 NATIVE_FS = 400                   # częstotliwość natywna SaMi-Trop
+OUT_FS = 100                      # docelowa częstotliwość
 WINDOW_S = 7                      # długość okna w sekundach
 SEED = 67
 _rng = np.random.default_rng(SEED)
@@ -45,7 +43,7 @@ _rng = np.random.default_rng(SEED)
 
 def get_parser():
     parser = argparse.ArgumentParser(
-        description='Buduje macierze EKG (100/250 resampled, 400 oryginal), etykiet i metadanych z Sami-Trop.')
+        description='Buduje macierze EKG (w częstotliwości 100 Hz), etykiet i metadanych z Sami-Trop.')
     parser.add_argument('-i', '--data_folder', type=str, default='samitrop-data',
                         help='Folder z danymi Sami-Trop (domyślnie: samitrop-data).')
     parser.add_argument('-o', '--output_folder', type=str, default='semi-processed-data',
@@ -94,7 +92,7 @@ def build_metadata_row(is_male, age, normal_ecg):
 
 
 # Główna procedura: czyta metadane i sygnały z HDF5, dla każdego rekordu obcina zera,
-# losuje 7 s okno, robi resampling do 250 i 100 Hz, a na końcu zapisuje macierze
+# losuje 7 s okno, robi resampling 100 Hz, a na końcu zapisuje macierze
 def run(args):
     hdf5_path = os.path.join(args.data_folder, SIGNAL_HDF5)
     csv_path = os.path.join(args.data_folder, DEMOGRAPHICS_CSV)
@@ -108,13 +106,10 @@ def run(args):
     csv_rows = [(int(r['exam_id']), r['age'], r['is_male'], r['normal_ecg'])
                 for _, r in df.iterrows()]
 
-    # Długości okna w próbkach dla każdej częstotliwości
-    len_100 = WINDOW_S * 100
-    len_250 = WINDOW_S * 250
-    len_400 = WINDOW_S * 400
+    # Długość okna w próbkach
+    window_len = WINDOW_S * OUT_FS
 
-    ecg_100, ecg_250, ecg_400 = [], [], []
-    metadata, exam_ids = [], []
+    ecg_100, metadata = [], []
     n_skipped = 0
 
     with h5py.File(hdf5_path, 'r') as f:
@@ -146,49 +141,37 @@ def run(args):
             sig250 = resample_signal(sig400, NATIVE_FS, 250)
             sig100 = resample_signal(sig400, NATIVE_FS, 100)
 
-            # Transpozycja do (12, L) i dodanie do list (surowe mV, bez filtra/normalizacji)
-            ecg_400.append(sig400[:len_400].T)
-            ecg_250.append(sig250[:len_250].T)
-            ecg_100.append(sig100[:len_100].T)
+            # Transpozycja do (12, L) i dodanie do list (surowe mV, bez filtra/normalizacji)    
+            ecg_100.append(sig100[:window_len].T)
             metadata.append(build_metadata_row(is_male, age, normal_ecg))
-            exam_ids.append(exam_id)
 
-            if len(exam_ids) % 250 == 0:
-                print(f'  przetworzono {len(exam_ids)} recordów')
+            if len(metadata) % 250 == 0:
+                print(f'  przetworzono {len(metadata)} recordów')
 
-    n = len(exam_ids)
+    n = len(metadata)
 
     # Złożenie macierzy (N, 12, L)
     ecg_100 = np.stack(ecg_100).astype(np.float32)
-    ecg_250 = np.stack(ecg_250).astype(np.float32)
-    ecg_400 = np.stack(ecg_400).astype(np.float32)
     labels = np.ones((n,), dtype=np.int64)             # wszyscy chorzy -> 1
     metadata = np.asarray(metadata, dtype=np.float32)  # [płeć, wiek, normal_ecg]
-    exam_ids = np.asarray(exam_ids, dtype=np.int64)
 
     # Zapis wyników
     os.makedirs(args.output_folder, exist_ok=True)
     out = args.output_folder
-    np.save(os.path.join(out, 'ecg_samitrop_100hz_resampled.npy'), ecg_100)
-    np.save(os.path.join(out, 'ecg_samitrop_250hz_resampled.npy'), ecg_250)
-    np.save(os.path.join(out, 'ecg_samitrop_400hz.npy'), ecg_400)
+    np.save(os.path.join(out, 'ecg_samitrop_100hz.npy'), ecg_100)
     np.save(os.path.join(out, 'labels_samitrop.npy'), labels)
     np.save(os.path.join(out, 'metadata_samitrop.npy'), metadata)
-    np.save(os.path.join(out, 'exam_ids_samitrop.npy'), exam_ids)
 
     # Podsumowanie
     print(f'\nPrzetworzono {n} rekordów (pominięto {n_skipped}).')
     print('Zapisano:')
     print(f'  ecg_samitrop_100hz_resampled.npy : {ecg_100.shape}')
-    print(f'  ecg_samitrop_250hz_resampled.npy : {ecg_250.shape}')
-    print(f'  ecg_samitrop_400hz.npy           : {ecg_400.shape}')
     print(f'  labels_samitrop.npy              : {labels.shape}')
     print(f'  metadata_samitrop.npy            : {metadata.shape}')
-    print(f'  exam_ids_samitrop.npy            : {exam_ids.shape}')
 
     # Podgląd pierwszego recordu dla metadanych i sygnału
     # print('metadata[0] :', metadata[0])
-    # print('ecg_400 record 0, próbka 0, wszystkie 12 leadów:\n', ecg_400[0, :, 0])
+    # print('ecg_100 record 0, próbka 0, wszystkie 12 leadów:\n', ecg_100[0, :, 0])
 
 
 if __name__ == '__main__':

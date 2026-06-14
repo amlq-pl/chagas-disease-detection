@@ -14,10 +14,7 @@ W odróżnieniu od Sami-Trop nie parujemy po pozycji - exams.csv jest globalny d
 bazy, a pliki .hdf5 to jej fragmenty. Dlatego parujemy po exam_id. Jeśli dla danego exam_id
 nie ma etykiety albo metadanych, pomijamy record.
 
-Zapisujemy 3 macierze EKG w częstotliwościach:
-- 100 po resamplingu
-- 250 po resamplingu
-- 400, oryginalne
+Zapisujemy macierz EKG w częstotliwości 100 Hz.
 Dodatkowo - macierz etykiet i macierz metadanych [płeć, wiek, normal_ecg].
 
 Układ macierzy EKG: (N, 12, L)
@@ -52,6 +49,7 @@ SIGNAL_HDF5_SUFFIX = '.hdf5'                        # sufix nazwy plików z maci
 DEMOGRAPHICS_CSV = 'exams.csv'                      # metadane
 CHAGAS_LABELS_CSV = 'code15_chagas_labels.csv'      # etykiety
 NATIVE_FS = 400                                     # częstotliwość natywna
+OUT_FS = 100                                        # częstotliwość docelowa
 WINDOW_S = 7                                        # długość okna w sekundach
 SEED = 67
 _rng = np.random.default_rng(SEED)
@@ -59,7 +57,7 @@ _rng = np.random.default_rng(SEED)
 
 def get_parser():
     parser = argparse.ArgumentParser(
-        description='Buduje macierze EKG (100/250 resampled, 400 oryginal), etykiet i metadanych z CODE-15%.')
+        description='Buduje macierze EKG (w 100 Hz), etykiet i metadanych z CODE-15%.')
     parser.add_argument('-i', '--data_folder', type=str, default='code15-data',
                         help='Folder z danymi CODE-15%% (domyślnie: code15-data).')
     parser.add_argument('-o', '--output_folder', type=str, default='semi-processed-data',
@@ -135,13 +133,10 @@ def load_lookup_tables(data_folder):
 def run(args):
     meta_by_id, label_by_id = load_lookup_tables(args.data_folder)
 
-    # Długości okna w próbkach dla każdej częstotliwości
-    len_100 = WINDOW_S * 100
-    len_250 = WINDOW_S * 250
-    len_400 = WINDOW_S * 400
+    # Długość okna dla częstotliwości docelowej
+    window_len = WINDOW_S * OUT_FS
 
-    ecg_100, ecg_250, ecg_400 = [], [], []
-    metadata, labels, exam_ids = [], [], []
+    ecg_100, metadata, labels = [], [], []
     n_skipped = 0
     n_files = 0
 
@@ -189,43 +184,33 @@ def run(args):
                     n_skipped += 1
                     continue
 
-                # 250 i 100 Hz z resamplingu tego samego 7 s okna (filtr i standaryzacja - w merge_and_process_data.py)
-                sig250 = resample_signal(sig400, NATIVE_FS, 250)
+                # 100 Hz z resamplingu 7 s okna (filtr i standaryzacja - w merge_and_process_data.py)
                 sig100 = resample_signal(sig400, NATIVE_FS, 100)
 
                 # Transpozycja do (12, L) i dodanie do list (surowe mV, bez filtra/normalizacji)
-                ecg_400.append(sig400[:len_400].T)
-                ecg_250.append(sig250[:len_250].T)
-                ecg_100.append(sig100[:len_100].T)
+                ecg_100.append(sig100[:window_len].T)
                 metadata.append(meta_row)
                 labels.append(label)
-                exam_ids.append(exam_id)
 
-                if len(exam_ids) % 250 == 0:
-                    print(f'  przetworzono {len(exam_ids)} recordów')
+                if len(metadata) % 250 == 0:
+                    print(f'  przetworzono {len(metadata)} recordów')
 
         n_files += 1
         file_idx += 1
 
-    n = len(exam_ids)
+    n = len(metadata)
 
     # Złożenie macierzy (N, 12, L)
     ecg_100 = np.stack(ecg_100).astype(np.float32)
-    ecg_250 = np.stack(ecg_250).astype(np.float32)
-    ecg_400 = np.stack(ecg_400).astype(np.float32)
     labels = np.asarray(labels, dtype=np.int64)        # 0 -> zdrowy, 1 -> chory
     metadata = np.asarray(metadata, dtype=np.float32)  # [płeć, wiek, normal_ecg]
-    exam_ids = np.asarray(exam_ids, dtype=np.int64)
 
     # Zapis wyników
     os.makedirs(args.output_folder, exist_ok=True)
     out = args.output_folder
-    np.save(os.path.join(out, 'ecg_code15_100hz_resampled.npy'), ecg_100)
-    np.save(os.path.join(out, 'ecg_code15_250hz_resampled.npy'), ecg_250)
-    np.save(os.path.join(out, 'ecg_code15_400hz.npy'), ecg_400)
+    np.save(os.path.join(out, 'ecg_code15_100hz.npy'), ecg_100)
     np.save(os.path.join(out, 'labels_code15.npy'), labels)
     np.save(os.path.join(out, 'metadata_code15.npy'), metadata)
-    np.save(os.path.join(out, 'exam_ids_code15.npy'), exam_ids)
 
     # Podsumowanie
     n_pos = int((labels == 1).sum())
@@ -233,15 +218,12 @@ def run(args):
     print(f'{n_pos} chorych, {n - n_pos} zdrowych.')
     print('Zapisano:')
     print(f'  ecg_code15_100hz_resampled.npy : {ecg_100.shape}')
-    print(f'  ecg_code15_250hz_resampled.npy : {ecg_250.shape}')
-    print(f'  ecg_code15_400hz.npy           : {ecg_400.shape}')
     print(f'  labels_code15.npy              : {labels.shape}')
     print(f'  metadata_code15.npy            : {metadata.shape}')
-    print(f'  exam_ids_code15.npy            : {exam_ids.shape}')
 
     # Podgląd pierwszego recordu dla metadanych i sygnału
     # print('metadata[0] :', metadata[0])
-    # print('ecg_400 record 0, próbka 0, wszystkie 12 leadów:\n', ecg_400[0, :, 0])
+    # print('ecg_100 record 0, próbka 0, wszystkie 12 leadów:\n', ecg_100[0, :, 0])
 
 
 if __name__ == '__main__':
