@@ -94,6 +94,12 @@ class ResNet18(torch.nn.Module):
 
 
 if __name__ == "__main__":
+    import datetime, os, sys
+
+    def log(msg=""):
+        ts = datetime.datetime.now().strftime("%H:%M:%S")
+        print(f"[{ts}] {msg}", flush=True)
+
     NUM_EPOCHS = 20
     BATCH_SIZE = 64
     CACHE_FRACTION = 1.0  # ułamek każdego splitu trzymany w RAM; reszta z mmap (dysk)
@@ -103,16 +109,42 @@ if __name__ == "__main__":
     ECG_PATH = DIRPATH + "/" + "ecg_merged_100hz_resampled.npy"
     LABELS = DIRPATH + "/" + "labels_merged.npy"
 
+    log("=" * 55)
+    log("ResNet2D — start treningu")
+    log(f"device      : {device}")
+    log(f"torch       : {torch.__version__}")
+    log(f"ECG_PATH    : {ECG_PATH}  ({os.path.getsize(ECG_PATH) / 1e9:.2f} GB)" if os.path.isfile(ECG_PATH) else f"ECG_PATH    : {ECG_PATH}  [BRAK PLIKU]")
+    log(f"LABELS      : {LABELS}")
+    log(f"epochs      : {NUM_EPOCHS}  |  batch: {BATCH_SIZE}  |  patience: {EARLY_STOPPING_PATIENCE}")
+    log("=" * 55)
+
+    log("Wczytywanie i budowanie datasetów (cache + spektrogramy) ...")
     train_dataset_t, eval_dataset_t, test_dataset_t, y_train, y_val, y_test = (
         make_cached_spectrogram_datasets(ECG_PATH, LABELS, cache_fraction=CACHE_FRACTION, seed=42)
     )
 
-    model = ResNet18().to(device)
-    compiled_model = torch.compile(model)
+    n_pos_tr = int(y_train.sum()); n_neg_tr = len(y_train) - n_pos_tr
+    n_pos_v  = int(y_val.sum());   n_neg_v  = len(y_val)   - n_pos_v
+    n_pos_te = int(y_test.sum());  n_neg_te = len(y_test)  - n_pos_te
+    log(f"Train : {len(y_train):>6}  (pos={n_pos_tr}, neg={n_neg_tr}, ratio={n_neg_tr/max(n_pos_tr,1):.1f}:1)")
+    log(f"Val   : {len(y_val):>6}  (pos={n_pos_v},  neg={n_neg_v})")
+    log(f"Test  : {len(y_test):>6}  (pos={n_pos_te},  neg={n_neg_te})")
 
-    n_pos = int(y_train.sum())
-    n_neg = len(y_train) - n_pos
+    log("Budowanie modelu ResNet18 ...")
+    model = ResNet18().to(device)
+    n_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    log(f"Parametry modelu: {n_params:,}")
+    if device.type == "mps":
+        compiled_model = model  # torch.compile niestabilny na MPS
+        log("torch.compile() pominięty (MPS)")
+    else:
+        compiled_model = torch.compile(model)
+        log("torch.compile() gotowy")
+
+    n_pos = n_pos_tr
+    n_neg = n_neg_tr
     pos_weight = torch.tensor([n_neg / n_pos], dtype=torch.float32, device=device)
+    log(f"pos_weight (BCEWithLogitsLoss): {pos_weight.item():.4f}")
 
     # num_workers>0, bo spektrogram liczony jest on-the-fly (CPU-heavy).
     # Uwaga: na macOS (spawn) cache RAM jest duplikowany per-worker; przy dużym
@@ -141,12 +173,16 @@ if __name__ == "__main__":
         pin_memory=True,
         num_workers=4,
     )
+    log(f"DataLoadery gotowe  (train batches: {len(train_data_loader)}, val: {len(eval_data_loader)}, test: {len(test_data_loader)})")
 
     # Parametry do treningu
     lr = 0.0001
     criterion = torch.nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = torch.optim.AdamW(compiled_model.parameters(), lr=lr)
+    log(f"Optimizer: AdamW  lr={lr}")
+    log("Rozpoczynam trening ...\n")
 
+    t_start = datetime.datetime.now()
     best_auprc, best_epoch, history = train(
         optimizer,
         criterion,
@@ -157,7 +193,16 @@ if __name__ == "__main__":
         early_stopping=EARLY_STOPPING_PATIENCE,
         checkpoint_path=CHECKPOINT,
     )
+    t_end = datetime.datetime.now()
+    elapsed = (t_end - t_start).total_seconds()
+    log(f"\nTrening zakończony  (czas: {elapsed/60:.1f} min  |  best epoch: {best_epoch}  |  best val AUPRC: {best_auprc:.4f})")
 
+    log("Ewaluacja na teście ...")
     # train() przywraca najlepsze wagi (po AUPRC na walidacji) przed zwróceniem
     test_auroc, test_auprc, test_acc = validate(test_data_loader, compiled_model)
-    print(f"\n=== TEST ===\nAUROC: {test_auroc:.4f}, AUPRC: {test_auprc:.4f}, ACC: {test_acc:.4f}")
+    log("=" * 55)
+    log(f"=== WYNIK TESTOWY ===")
+    log(f"  AUROC : {test_auroc:.4f}")
+    log(f"  AUPRC : {test_auprc:.4f}")
+    log(f"  ACC   : {test_acc:.4f}")
+    log("=" * 55)
