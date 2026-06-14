@@ -1,0 +1,71 @@
+\section*{Dane i ich przetwarzanie}
+Twórcy dostarczają nam 3 datasety:
+\begin{itemize}
+    \item PTB-XL: \url{https://physionet.org/content/ptb-xl/1.0.3/}
+    \item SaMi-Trop: \url{https://zenodo.org/records/4905618}
+    \item CODE-15\%: \url{https://zenodo.org/records/4916206}
+\end{itemize}
+
+\subsection*{PTB-XL}
+Badanie PTB-XL zostało przeprowadzone w Niemczech i ze względu na geograficzne położenie,
+zawiera dane wyłącznie osób zdrowych. Badania EKG były oryginalnie wykonane w częstotliwości
+500~Hz, ale twórcy dostarczają je również w formie resamplowanej do 100~Hz. Baza zawiera
+ok.~22 tysięcy rekordów po 10 sekund z dołączonymi obszernymi metadanymi. Większość z nich
+jednak nie pokrywała się z metadanymi z pozostałych dwóch badań, a np.\ przy wadze i wzroście
+większość rekordów jest nieuzupełnionych. Dlatego też wstępnie uznaliśmy, że najlepiej będzie
+brać pod uwagę wyłącznie wiek i płeć.
+
+\subsection*{Sami-Trop}
+Badanie zostało przeprowadzone w Brazylii i zawiera 1631 rekordów. Zawiera sygnały EKG
+w częstotliwości 400~Hz po 7 lub 10 sekund. Wszyscy badani są chorzy - etykieta ta jest
+pewna ze względu na przeprowadzone badania immunologiczne. Danych tabelarycznych jest
+absolutne minimum: płeć, wiek, $normal\_ecg$, $death$ i $timey$.
+
+\subsection*{CODE-15\%}
+Zdecydowanie największe badanie - posiada ok.~45~GB danych. Analogicznie do SaMi-Trop,
+zostało wykonane w Brazylii, dlatego sygnały EKG są w analogicznej formie. Metadanych jest
+sporo, jednak zdecydowaliśmy się wyciągać z nich to, co z SaMi-Trop: płeć, wiek oraz
+$normal\_ecg$. Etykiety natomiast są ,,słabe'' - o ile osoby z przypisaną jedynką
+są raczej na pewno chore, to osoby uznane za zdrowe po prostu nie mają objawów choroby,
+co nie świadczy o braku zakażenia ze stuprocentową pewnością.
+
+\subsection*{Wybór baz danych}
+Podczas trenowania modeli opisanych w kolejnych sekcjach napotkaliśmy na poważny problem -
+modele bardzo dobrze zaczęły odróżniać dane brazylijskie od niemieckich. Mamy kilka teorii:
+\begin{enumerate}
+    \item Sygnały niemieckie z jakiegoś powodu miały dużo wyższą amplitudę względem tych
+    brazylijskich, a standaryzacja zawiodła.
+    \item Ze względu na pochodzenie etniczne, badania EKG z Niemiec bazowo różnią się od
+    tych z Brazylii.
+    \item Resampling zawiódł.
+\end{enumerate}
+Ze względu na ten kłopot, zdecydowaliśmy się całkowicie pominąć badanie PTB-XL.
+
+
+\subsubsection*{Przygotowanie zbiorów i walidacja - skrypty $prepare\_*$}
+Oba skrypty $prepare\_*$ wykonują następujące operacje na każdym recordzie:
+\begin{itemize}
+    \item Sygnały 7-sekundowe są dopełniane na początku i końcu zerami - dlatego pozbywamy się ich.
+    \item Odrzucamy recordy zawierające NaNy i płaskie sygnały.
+    \item Wycinamy losowe okna 7-sekundowe z sygnału 400 Hz.
+    \item Resampling do 100 Hz.
+    za pomocą (\texttt{scipy.signal.resample\_poly}).
+\end{itemize}
+
+Wynikiem każdego skryptu są macierze NumPy o układzie $(N, 12, L)$, gdzie $N$ to liczba
+rekordów, 12 to liczba leadów EKG, a $L$ to liczba próbek w czasie. Dodatkowe pliki zawierają etykiety, metadane
+(płeć, wiek, $normal\_ecg$) oraz identyfikatory recordów.
+
+\subsubsection*{Scalanie i przetwarzanie - skrypt $merge\_and\_process\_data.py$}
+Skrypt $merge\_and\_process\_data.py$ łączy oba zbiory i wykonuje operacje:
+\begin{itemize}
+    \item Filtruje sygnały za pomocą filtru pasmowego 0,5 - 40 Hz. Usuwa szumy spowodowane nieistotnymi
+    wydarzeniami, takimi jak oddech czy przypadkowy ruch ciała pacjenta.
+    \item Aplikuje standaryzację Z - zachowuje ona kształt sygnałów dla każdego leadu,
+    więc wydaje się być naturalnym wyborem.
+\end{itemize}
+
+Wynikiem końcowym są scalone macierze EKG
+$ecg\_merged\_100hz*.npy$, macierz etykiet
+$labels\_merged.npy$, metadanych $metadata\_merged.npy$ oraz
+unikalnych identyfikatorów $ids\_merged.npy$.

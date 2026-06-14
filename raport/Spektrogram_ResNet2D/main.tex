@@ -1,0 +1,24 @@
+\section{Spektrogram i ResNet2D}
+
+\subsection{Spektrogram}
+Domyślnie sygnał EKG jest jednowymiarowy. Lekarze jednak korzystają czasem ze spektrogramu, 
+który pokazuje, jak zmienia się zawartość sygnału w czasie. Dzięki temu z jednowymiarowego przebiegu $(12, L)$
+otrzymujemy dwuwymiarową mapę $(12, F, T)$, gdzie $F$ jest liczbą pasm częstotliwości, a $T$
+to liczba okien czasowych.
+
+Spektrogram obliczamy przy użyciu STFT,
+korzystając z gotowej implementacji dostępnej w bibliotece $scipy$.
+Przesuwa ona krótkie okno czasowe po sygnale i dla każdej pozycji sprawdza,
+jakie częstotliwości w nim dominują. W naszym przypadku okno ma długość 128 próbek
+i przesuwa się co 32 próbki. Wyniki w powstałej macierzy logarytmujemy, żeby pozornie
+małe różnice między niskimi wynikami nie zostały "wyciszone" względem wyników wysokich.
+
+\subsection{ResNet2D}
+Mając spektrogram jako wejście w postaci obrazu $(12, F, T)$, możemy zastosować
+standardową sieć konwolucyjną operującą w dwóch wymiarach. Wykorzystujemy tę
+samą architekturę ResNet18 opisaną w poprzedniej sekcji, z tą różnicą, że
+wszystkie warstwy konwolucyjne są dwuwymiarowe.
+
+To podejście jest o tyle unikalne, że sieć może jednocześnie uczyć się
+wzorców zarówno w osi czasu, jak i w osi częstotliwości, co jest trudniejsze
+do osiągnięcia przy pozostałych modelach.
