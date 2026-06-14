@@ -97,11 +97,13 @@ class InceptionBlock(torch.nn.Module):
 
 
 class InceptionNetwork(torch.nn.Module):
-    def __init__(self, in_channels, num_channels=32) -> None:
+    def __init__(self, in_channels, num_channels=32, use_meta=False, meta_dim=3) -> None:
         super().__init__()
         self.in_channels = in_channels
         self.num_channels = num_channels
         self.inter_channels = 4 * self.num_channels
+        self.use_meta = use_meta
+        self.meta_dim = meta_dim if use_meta else 0
 
         self.in_block = InceptionBlock(in_channels=self.in_channels, num_channels=self.num_channels)
         self.out_block = InceptionBlock(
@@ -109,11 +111,13 @@ class InceptionNetwork(torch.nn.Module):
         )
 
         self.pool = torch.nn.AdaptiveAvgPool1d(1)
-        self.fc = torch.nn.Linear(self.inter_channels, 1)
+        self.fc = torch.nn.Linear(self.inter_channels + self.meta_dim, 1)
 
-    def forward(self, input):
+    def forward(self, input, meta):
         output = self.in_block(input)
         output = self.out_block(output)
         output = self.pool(output)
         output = torch.flatten(output, 1)
+        if self.use_meta:
+            output = torch.cat([output, meta], dim=1)
         return self.fc(output)
