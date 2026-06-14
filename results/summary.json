@@ -1,0 +1,62 @@
+[
+  {
+    "name": "resnet18",
+    "best_val_auprc": 0.17755160160217096,
+    "test_auroc": 0.8066010808400313,
+    "test_auprc": 0.16047777657592643,
+    "test_acc": 0.774567379218542,
+    "duration_s": 1080.3369569778442,
+    "best_epoch": 5,
+    "n_params": 3849345
+  },
+  {
+    "name": "resnet18_meta",
+    "best_val_auprc": 0.17104409025134368,
+    "test_auroc": 0.8111388463288218,
+    "test_auprc": 0.16244706930334132,
+    "test_acc": 0.7587111424320727,
+    "duration_s": 1082.0653946399689,
+    "best_epoch": 4,
+    "n_params": 3849348
+  },
+  {
+    "name": "resnet18_meta_aug",
+    "best_val_auprc": 0.1707557716132562,
+    "test_auroc": 0.8060101086245138,
+    "test_auprc": 0.15904307411024798,
+    "test_acc": 0.7796961866729308,
+    "duration_s": 1707.3800520896912,
+    "best_epoch": 5,
+    "n_params": 3849348
+  },
+  {
+    "name": "inception",
+    "best_val_auprc": 0.20529445558619294,
+    "test_auroc": 0.8060940239559332,
+    "test_auprc": 0.1706669128191237,
+    "test_acc": 0.7931642001409444,
+    "duration_s": 3498.0467731952667,
+    "best_epoch": 14,
+    "n_params": 430593
+  },
+  {
+    "name": "inception_meta",
+    "best_val_auprc": 0.20137675590170906,
+    "test_auroc": 0.8159435993908979,
+    "test_auprc": 0.15921232507958868,
+    "test_acc": 0.7557748022864302,
+    "duration_s": 2793.667222261429,
+    "best_epoch": 10,
+    "n_params": 430596
+  },
+  {
+    "name": "inception_meta_aug",
+    "best_val_auprc": 0.20170768774331863,
+    "test_auroc": 0.8181223282366054,
+    "test_auprc": 0.1703710587814702,
+    "test_acc": 0.8359760394644116,
+    "duration_s": 4162.348761558533,
+    "best_epoch": 13,
+    "n_params": 430596
+  }
+]
