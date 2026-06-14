@@ -64,7 +64,7 @@ def train(
     best_state = None
     best_epoch = -1
     epochs_no_improve = 0
-    history = []  # lista dictow per epoch - do zapisu metryk i pozniejszego rysowania
+    history = []  # lista dictow per epoch - do zapisu metryk i pozniejszego plotowania wykresów
 
     for i in range(num_epochs):
         model.train()
@@ -173,7 +173,7 @@ def make_tensor_datasets(X_train, y_train, X_val, y_val, X_test, y_test):
     return train_dataset_t, eval_dataset_t, test_dataset_t
 
 
-# Stratyfikowany split na train/val/test po indeksach - nie kopiuje samych danych
+# Stratyfikowany split na train/val/test po indeksach
 def split_indices(y, test_size=0.15, val_size=0.15, seed=42):
     n = len(y)
     idx = np.arange(n)
@@ -214,7 +214,7 @@ def make_mmap_datasets(
         meta_val[:, 1] = (meta_val[:, 1] - age_mean) / age_std
         meta_test[:, 1] = (meta_test[:, 1] - age_mean) / age_std
     else:
-        # Pusta meta - zerowy wymiar; model wtedy musi miec meta_dim=0
+        # Puste metadane - zerowy wymiar; model wtedy musi miec meta_dim=0
         meta_train = np.zeros((len(train_idx), 0), dtype=np.float32)
         meta_val = np.zeros((len(val_idx), 0), dtype=np.float32)
         meta_test = np.zeros((len(test_idx), 0), dtype=np.float32)
