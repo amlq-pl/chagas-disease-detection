@@ -41,6 +41,9 @@ modele bardzo dobrze zaczęły odróżniać dane brazylijskie od niemieckich. Ma
 \end{enumerate}
 Ze względu na ten kłopot, zdecydowaliśmy się całkowicie pominąć badanie PTB-XL.
 
+\subsection{Skrypty}
+Opisy użycia skryptów są na samej górze w samych plikach. Skrypty wymagają wcześniejszego ręcznego
+pobrania danych na dysk (domyślnie do folderów $samitrop-data$ oraz $code15-data$).
 
 \subsubsection*{Przygotowanie zbiorów i walidacja - skrypty $prepare\_*$}
 Oba skrypty $prepare\_*$ wykonują następujące operacje na każdym recordzie:
@@ -49,7 +52,7 @@ Oba skrypty $prepare\_*$ wykonują następujące operacje na każdym recordzie:
     \item Odrzucamy recordy zawierające NaNy i płaskie sygnały.
     \item Wycinamy losowe okna 7-sekundowe z sygnału 400 Hz.
     \item Resampling do 100 Hz.
-    za pomocą (\texttt{scipy.signal.resample\_poly}).
+    za pomocą $scipy.signal.resample\_poly$.
 \end{itemize}
 
 Wynikiem każdego skryptu są macierze NumPy o układzie $(N, 12, L)$, gdzie $N$ to liczba
