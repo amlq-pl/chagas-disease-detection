@@ -27,6 +27,7 @@ CODE15_NAME =  'ecg_code15_100hz.npy'
 OUT_NAME =  'ecg_merged_100hz.npy'
 LOW = 0.5
 HIGH = 40
+CHUNK = 512
 
 
 def get_parser():
@@ -62,6 +63,21 @@ def load(folder, name):
     return np.load(path)
 
 
+def load_mmap(folder, name):
+    path = os.path.join(folder, name)
+    if not os.path.isfile(path):
+        sys.exit(f'Nie znaleziono pliku: {path}.')
+    return np.load(path, mmap_mode='r')
+
+
+def stream(dst, src, start):
+    n = src.shape[0]
+    for i in range(0, n, CHUNK):
+        j = min(i + CHUNK, n)
+        block = np.asarray(src[i:j], dtype=np.float32)
+        dst[start + i:start + j] = standardize(bandpass(block, FS, LOW, HIGH))
+
+
 def run(args):
     inp, out = args.input_folder, args.output_folder
     os.makedirs(out, exist_ok=True)
@@ -84,17 +100,22 @@ def run(args):
     print(f'Filtr pasmowy: {LOW}-{HIGH} Hz\n')
 
     # Dla każdego wpisu: wczytaj obie macierze, przefiltruj, standaryzuj, sklej i zapisz
-    Xs = load(inp, SAMITROP_NAME)
-    Xc = load(inp, CODE15_NAME)
+    Xs = load_mmap(inp, SAMITROP_NAME)
+    Xc = load_mmap(inp, CODE15_NAME)
     if Xs.shape[0] != n_s or Xc.shape[0] != n_c:
         sys.exit(f'Niezgodna liczba recordów dla {OUT_NAME} (EKG vs etykiety).')
+    if Xs.shape[1:] != Xc.shape[1:]:
+        sys.exit(f'Niezgodny kształt recordu: {Xs.shape[1:]} vs {Xc.shape[1:]}.')
 
-    Xs = standardize(bandpass(Xs, FS, LOW, HIGH))
-    Xc = standardize(bandpass(Xc, FS, LOW, HIGH))
-    X = np.concatenate([Xs, Xc], axis=0)
+    out_path = os.path.join(out, OUT_NAME)
+    out_shape = (n_s + n_c,) + Xs.shape[1:]
+    X = np.lib.format.open_memmap(out_path, mode='w+', dtype=np.float32, shape=out_shape)
+    stream(X, Xs, 0)
+    stream(X, Xc, n_s)
+    X.flush()
 
-    np.save(os.path.join(out, OUT_NAME), X)
     print(f'  {OUT_NAME:32s}: {X.shape}')
+    del X, Xs, Xc
 
     print(f'\nlabels_merged.npy   : {labels.shape}')
     print(f'metadata_merged.npy : {metadata.shape}')
