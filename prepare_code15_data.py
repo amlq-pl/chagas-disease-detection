@@ -128,19 +128,11 @@ def load_lookup_tables(data_folder):
     return meta_by_id, label_by_id
 
 
-# Główna procedura: czyta metadane i etykiety, iteruje po plikach exams_part{i}.hdf5, dla
-# każdego rekordu obcina zera, losuje 7 s okno, resampling do 250/100 Hz i zapis macierzy
-def run(args):
-    meta_by_id, label_by_id = load_lookup_tables(args.data_folder)
-
-    # Długość okna dla częstotliwości docelowej
-    window_len = WINDOW_S * OUT_FS
-
-    ecg_100, metadata, labels = [], [], []
-    n_skipped = 0
+# Iteruje po plikach exams_part{i}.hdf5 i zwraca kolejno (sig, meta_row, label) dla recordów,
+# które przeszły kontrolę.
+def iter_valid_records(args, meta_by_id, label_by_id):
+    win400 = WINDOW_S * NATIVE_FS
     n_files = 0
-
-    # Pętla po plikach: budujemy nazwę z prefixu + numeru + sufixu
     file_idx = 0
     while True:
         if args.limit and args.limit > 0 and n_files >= args.limit:
@@ -164,66 +156,77 @@ def run(args):
 
                 # Parujemy po exam_id - bez etykiety albo metadanych nie ma sensu brać recordu
                 if exam_id not in label_by_id or exam_id not in meta_by_id:
-                    n_skipped += 1
                     continue
-                meta_row = meta_by_id[exam_id]
-                label = label_by_id[exam_id]
 
                 sig = np.asarray(tracings[j], dtype=np.float32)   # (4096, 12), 400 Hz, mV
                 sig = strip_zero_padding(sig)                     # usuń padding zerowy
                 if sig is None:
-                    n_skipped += 1
                     continue
                 # Kontrola jakości - odrzucamy NaN/Inf i martwe zapisy
                 if not is_valid(sig):
-                    n_skipped += 1
+                    continue
+                # Sygnał krótszy niż 7 s -> pomijamy (okna nie da się wyciąć)
+                if sig.shape[0] < win400:
                     continue
 
-                sig400 = random_window_400(sig)                   # losowe 7 s okno @ 400 Hz
-                if sig400 is None:                                # sygnał < 7 s -> pomijamy
-                    n_skipped += 1
-                    continue
-
-                # 100 Hz z resamplingu 7 s okna (filtr i standaryzacja - w merge_and_process_data.py)
-                sig100 = resample_signal(sig400, NATIVE_FS, 100)
-
-                # Transpozycja do (12, L) i dodanie do list (surowe mV, bez filtra/normalizacji)
-                ecg_100.append(sig100[:window_len].T)
-                metadata.append(meta_row)
-                labels.append(label)
-
-                if len(metadata) % 250 == 0:
-                    print(f'  przetworzono {len(metadata)} recordów')
+                yield sig, meta_by_id[exam_id], label_by_id[exam_id]
 
         n_files += 1
         file_idx += 1
 
-    n = len(metadata)
 
-    # Złożenie macierzy (N, 12, L)
-    ecg_100 = np.stack(ecg_100).astype(np.float32)
-    labels = np.asarray(labels, dtype=np.int64)        # 0 -> zdrowy, 1 -> chory
-    metadata = np.asarray(metadata, dtype=np.float32)  # [płeć, wiek, normal_ecg]
+# Główna procedura:
+# Najpierw liczymy recordy, które później zapiszemy.
+# Następnie zapisujemy sygnały do pliku .npy przez memmap.
+def run(args):
+    meta_by_id, label_by_id = load_lookup_tables(args.data_folder)
 
-    # Zapis wyników
+    # Długość okna dla częstotliwości docelowej
+    window_len = WINDOW_S * OUT_FS
+
+    # Liczymy recordy
+    print('Liczenie recordów ...')
+    n = sum(1 for _ in iter_valid_records(args, meta_by_id, label_by_id))
+    if n == 0:
+        sys.exit('Brak recordów spełniających kryteria.')
+    print(f'Recordów do zapisania: {n}')
+
     os.makedirs(args.output_folder, exist_ok=True)
     out = args.output_folder
-    np.save(os.path.join(out, 'ecg_code15_100hz.npy'), ecg_100)
+    ecg_path = os.path.join(out, 'ecg_code15_100hz.npy')
+
+    # Zapisujemy sygnały przez memmap (N, 12, L)
+    print('Zapis sygnałów ...')
+    ecg_100 = np.lib.format.open_memmap(
+        ecg_path, mode='w+', dtype=np.float32, shape=(n, 12, window_len))
+    labels = np.empty(n, dtype=np.int64)        # 0 -> zdrowy, 1 -> chory
+    metadata = np.empty((n, 3), dtype=np.float32)  # [płeć, wiek, normal_ecg]
+
+    i = 0
+    for sig, meta_row, label in iter_valid_records(args, meta_by_id, label_by_id):
+        sig400 = random_window_400(sig)                   # losowe 7 s okno @ 400 Hz
+        # 100 Hz z resamplingu 7 s okna
+        sig100 = resample_signal(sig400, NATIVE_FS, 100)
+        ecg_100[i] = sig100[:window_len].T                # surowe mV, bez filtra/normalizacji
+        metadata[i] = meta_row
+        labels[i] = label
+        i += 1
+
+        if i % 250 == 0:
+            print(f'  zapisano {i} recordów')
+
+    ecg_100.flush()
     np.save(os.path.join(out, 'labels_code15.npy'), labels)
     np.save(os.path.join(out, 'metadata_code15.npy'), metadata)
 
     # Podsumowanie
     n_pos = int((labels == 1).sum())
-    print(f'\nPrzetworzono {n} rekordów (pominięto {n_skipped}).')
+    print(f'\nPrzetworzono {n} rekordów.')
     print(f'{n_pos} chorych, {n - n_pos} zdrowych.')
     print('Zapisano:')
-    print(f'  ecg_code15_100hz_resampled.npy : {ecg_100.shape}')
-    print(f'  labels_code15.npy              : {labels.shape}')
-    print(f'  metadata_code15.npy            : {metadata.shape}')
-
-    # Podgląd pierwszego recordu dla metadanych i sygnału
-    # print('metadata[0] :', metadata[0])
-    # print('ecg_100 record 0, próbka 0, wszystkie 12 leadów:\n', ecg_100[0, :, 0])
+    print(f'  {os.path.basename(ecg_path)} : {ecg_100.shape}')
+    print(f'  labels_code15.npy        : {labels.shape}')
+    print(f'  metadata_code15.npy      : {metadata.shape}')
 
 
 if __name__ == '__main__':
