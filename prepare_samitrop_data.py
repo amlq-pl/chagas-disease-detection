@@ -32,24 +32,39 @@ import pandas as pd
 import h5py
 from scipy.signal import resample_poly
 
-SIGNAL_HDF5 = 'exams.hdf5'        # gotowa macierz sygnałów
-DEMOGRAPHICS_CSV = 'exams.csv'    # metadane (exam_id, age, is_male)
-NATIVE_FS = 400                   # częstotliwość natywna SaMi-Trop
-OUT_FS = 100                      # docelowa częstotliwość
-WINDOW_S = 7                      # długość okna w sekundach
+SIGNAL_HDF5 = "exams.hdf5"  # gotowa macierz sygnałów
+DEMOGRAPHICS_CSV = "exams.csv"  # metadane (exam_id, age, is_male)
+NATIVE_FS = 400  # częstotliwość natywna SaMi-Trop
+OUT_FS = 100  # docelowa częstotliwość
+WINDOW_S = 7  # długość okna w sekundach
 SEED = 67
 _rng = np.random.default_rng(SEED)
 
 
 def get_parser():
     parser = argparse.ArgumentParser(
-        description='Buduje macierze EKG (w częstotliwości 100 Hz), etykiet i metadanych z Sami-Trop.')
-    parser.add_argument('-i', '--data_folder', type=str, default='samitrop-data',
-                        help='Folder z danymi Sami-Trop (domyślnie: samitrop-data).')
-    parser.add_argument('-o', '--output_folder', type=str, default='semi-processed-data',
-                        help='Folder na pliki wyjściowe .npy (domyślnie: semi-processed-data).')
-    parser.add_argument('--limit', type=int, default=0,
-                        help='Opcjonalnie: weź tylko pierwsze N recordów (0 = wszystkie).')
+        description="Buduje macierze EKG (w częstotliwości 100 Hz), etykiet i metadanych z Sami-Trop."
+    )
+    parser.add_argument(
+        "-i",
+        "--data_folder",
+        type=str,
+        default="samitrop-data",
+        help="Folder z danymi Sami-Trop (domyślnie: samitrop-data).",
+    )
+    parser.add_argument(
+        "-o",
+        "--output_folder",
+        type=str,
+        default="semi-processed-data",
+        help="Folder na pliki wyjściowe .npy (domyślnie: semi-processed-data).",
+    )
+    parser.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="Opcjonalnie: weź tylko pierwsze N recordów (0 = wszystkie).",
+    )
     return parser
 
 
@@ -67,18 +82,18 @@ def strip_zero_padding(sig):
     nonzero = np.where(~np.all(sig == 0, axis=1))[0]
     if nonzero.size == 0:
         return None
-    return sig[nonzero[0]:nonzero[-1] + 1]
+    return sig[nonzero[0] : nonzero[-1] + 1]
 
 
 # Wycięcie losowego 7-sekundowego okna z sygnału 400 Hz (2800 próbek)
 # Zwraca None, gdy sygnał jest krótszy niż 7 s
 def random_window_400(sig):
-    win = WINDOW_S * NATIVE_FS          # 2800 próbek
+    win = WINDOW_S * NATIVE_FS  # 2800 próbek
     if sig.shape[0] < win:
         return None
     max_start = sig.shape[0] - win
     start = int(_rng.integers(0, max_start + 1))
-    return sig[start:start + win]
+    return sig[start : start + win]
 
 
 # Kontrola jakości: odrzuca rekordy z NaN/Inf albo całkowicie płaskie (martwy zapis).
@@ -97,14 +112,15 @@ def run(args):
     hdf5_path = os.path.join(args.data_folder, SIGNAL_HDF5)
     csv_path = os.path.join(args.data_folder, DEMOGRAPHICS_CSV)
     if not os.path.isfile(hdf5_path):
-        sys.exit(f'Nie znaleziono pliku sygnałów: {hdf5_path}')
+        sys.exit(f"Nie znaleziono pliku sygnałów: {hdf5_path}")
     if not os.path.isfile(csv_path):
-        sys.exit(f'Nie znaleziono pliku metadanych: {csv_path}')
+        sys.exit(f"Nie znaleziono pliku metadanych: {csv_path}")
 
     # Metadane w kolejności z CSV. Parujemy po pozycji: i-ty wiersz CSV odpowiada tracings[i]
     df = pd.read_csv(csv_path)
-    csv_rows = [(int(r['exam_id']), r['age'], r['is_male'], r['normal_ecg'])
-                for _, r in df.iterrows()]
+    csv_rows = [
+        (int(r["exam_id"]), r["age"], r["is_male"], r["normal_ecg"]) for _, r in df.iterrows()
+    ]
 
     # Długość okna w próbkach
     window_len = WINDOW_S * OUT_FS
@@ -112,8 +128,8 @@ def run(args):
     ecg_100, metadata = [], []
     n_skipped = 0
 
-    with h5py.File(hdf5_path, 'r') as f:
-        tracings = f['tracings']                       # (N, próbki, 12)
+    with h5py.File(hdf5_path, "r") as f:
+        tracings = f["tracings"]  # (N, próbki, 12)
         n_total = min(len(csv_rows), tracings.shape[0])
         if args.limit and args.limit > 0:
             n_total = min(n_total, args.limit)
@@ -122,8 +138,8 @@ def run(args):
             # i-ty wiersz CSV <-> tracings[i].
             exam_id, age, is_male, normal_ecg = csv_rows[i]
 
-            sig = np.asarray(tracings[i], dtype=np.float32)   # (próbki, 12), 400 Hz, mV
-            sig = strip_zero_padding(sig)                     # usuń padding zerowy
+            sig = np.asarray(tracings[i], dtype=np.float32)  # (próbki, 12), 400 Hz, mV
+            sig = strip_zero_padding(sig)  # usuń padding zerowy
             if sig is None:
                 n_skipped += 1
                 continue
@@ -132,8 +148,8 @@ def run(args):
                 n_skipped += 1
                 continue
 
-            sig400 = random_window_400(sig)                   # losowe 7 s okno @ 400 Hz
-            if sig400 is None:                                # sygnał < 7 s -> pomijamy
+            sig400 = random_window_400(sig)  # losowe 7 s okno @ 400 Hz
+            if sig400 is None:  # sygnał < 7 s -> pomijamy
                 n_skipped += 1
                 continue
 
@@ -141,38 +157,38 @@ def run(args):
             sig250 = resample_signal(sig400, NATIVE_FS, 250)
             sig100 = resample_signal(sig400, NATIVE_FS, 100)
 
-            # Transpozycja do (12, L) i dodanie do list (surowe mV, bez filtra/normalizacji)    
+            # Transpozycja do (12, L) i dodanie do list (surowe mV, bez filtra/normalizacji)
             ecg_100.append(sig100[:window_len].T)
             metadata.append(build_metadata_row(is_male, age, normal_ecg))
 
             if len(metadata) % 250 == 0:
-                print(f'  przetworzono {len(metadata)} recordów')
+                print(f"  przetworzono {len(metadata)} recordów")
 
     n = len(metadata)
 
     # Złożenie macierzy (N, 12, L)
     ecg_100 = np.stack(ecg_100).astype(np.float32)
-    labels = np.ones((n,), dtype=np.int64)             # wszyscy chorzy -> 1
+    labels = np.ones((n,), dtype=np.int64)  # wszyscy chorzy -> 1
     metadata = np.asarray(metadata, dtype=np.float32)  # [płeć, wiek, normal_ecg]
 
     # Zapis wyników
     os.makedirs(args.output_folder, exist_ok=True)
     out = args.output_folder
-    np.save(os.path.join(out, 'ecg_samitrop_100hz.npy'), ecg_100)
-    np.save(os.path.join(out, 'labels_samitrop.npy'), labels)
-    np.save(os.path.join(out, 'metadata_samitrop.npy'), metadata)
+    np.save(os.path.join(out, "ecg_samitrop_100hz.npy"), ecg_100)
+    np.save(os.path.join(out, "labels_samitrop.npy"), labels)
+    np.save(os.path.join(out, "metadata_samitrop.npy"), metadata)
 
     # Podsumowanie
-    print(f'\nPrzetworzono {n} rekordów (pominięto {n_skipped}).')
-    print('Zapisano:')
-    print(f'  ecg_samitrop_100hz_resampled.npy : {ecg_100.shape}')
-    print(f'  labels_samitrop.npy              : {labels.shape}')
-    print(f'  metadata_samitrop.npy            : {metadata.shape}')
+    print(f"\nPrzetworzono {n} rekordów (pominięto {n_skipped}).")
+    print("Zapisano:")
+    print(f"  ecg_samitrop_100hz.npy : {ecg_100.shape}")
+    print(f"  labels_samitrop.npy              : {labels.shape}")
+    print(f"  metadata_samitrop.npy            : {metadata.shape}")
 
     # Podgląd pierwszego recordu dla metadanych i sygnału
     # print('metadata[0] :', metadata[0])
     # print('ecg_100 record 0, próbka 0, wszystkie 12 leadów:\n', ecg_100[0, :, 0])
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     run(get_parser().parse_args(sys.argv[1:]))

@@ -17,7 +17,7 @@ from training import make_mmap_datasets, train, validate
 # KONFIGURACJA
 # ============================================================
 DIRPATH = "processed-data"
-ECG_PATH = os.path.join(DIRPATH, "ecg_merged_100hz_resampled.npy")
+ECG_PATH = os.path.join(DIRPATH, "ecg_merged_100hz.npy")
 LABELS_PATH = os.path.join(DIRPATH, "labels_merged.npy")
 METADATA_PATH = os.path.join(DIRPATH, "metadata_merged.npy")
 RESULTS_DIR = "results"
