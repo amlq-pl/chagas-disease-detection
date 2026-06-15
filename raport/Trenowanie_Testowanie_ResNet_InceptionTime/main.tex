@@ -10,6 +10,21 @@ zostało określone w zbiorze jako poprawne) oraz z wykorzystaniem augmentacji d
 gaussowski z odchyleniem równym 0.05). Każdy z modeli bez augmentacji był trenowany przez maksymalnie 25 epok
 z mechanizmem wczesnego zatrzymania, jeśli przez 5 kolejnych epok nie zwiększała się wartość AUPRC na zbiorze walidacyjnym; dla wariantów z augmentacją limit
 epok wynosił 45, a patience 10 (ze względu na wolniejszą zbieżność). Następnie każdy z modeli był testowany na zbiorze testowym, czego wyniki można zobaczyć w Tabeli \ref{tab:resnet_inception_results}.
+
+\subsection{AUROC i AUPRC}
+Do oceny modeli używaliśmy dwóch miar stosowanych przy niezbalansowanych zbiorach: AUROC i AUPRC.
+Obie mierzą, jak dobrze model odróżnia osoby chore od zdrowych.
+
+AUROC to pole pod krzywą ROC. Mówi, jakie jest prawdopodobieństwo, że losowa osoba chora dostanie
+od modelu wyższą ocenę niż losowa zdrowa.
+
+W naszym przypadku lepszą miarą jest AUPRC, czyli pole pod krzywą precyzja-czułość. Zależy nam
+na wyłapaniu jak największej liczby chorych przy jak najmniejszej liczbie fałszywych alarmów.
+Wykrytych pacjentów można skierować na dodatkowe badania immunologiczne, których nie da się wykonać u każdego,
+więc liczy się trafność tych wskazań. AUPRC oddaje to znacznie lepiej niż AUROC. To właśnie AUPRC liczoną
+na zbiorze walidacyjnym po każdej epoce wykorzystujemy do wyboru najlepszego modelu.
+
+
 \begin{table}[H]
   \centering
   \begin{tabular}{lrrrrl}
