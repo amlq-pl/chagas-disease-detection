@@ -11,7 +11,7 @@ from inception_time import InceptionNetwork
 from training import make_mmap_datasets, train, validate
 
 DIRPATH = "processed-data"
-ECG_PATH = os.path.join(DIRPATH, "ecg_merged_100hz_resampled.npy")
+ECG_PATH = os.path.join(DIRPATH, "ecg_merged_100hz.npy")
 LABELS_PATH = os.path.join(DIRPATH, "labels_merged.npy")
 RESULTS_DIR = "results/ensemble"
 
@@ -74,6 +74,7 @@ def train_one_seed(seed, train_ds, val_ds, test_ds, y_train, run_dir):
     )
 
     model = InceptionNetwork(in_channels=12, use_meta=False).to(device)
+    # model = ResNet18(use_meta=False).to(device)
     compiled_model = torch.compile(model)
 
     n_pos = int(y_train.sum())
@@ -132,6 +133,7 @@ def collect_test_probs(checkpoint_path, test_ds):
     )
 
     model = InceptionNetwork(in_channels=12, use_meta=False).to(device)
+    # model = ResNet18(use_meta=False).to(device)
     compiled_model = torch.compile(model)
     state = torch.load(checkpoint_path, map_location=device)
     compiled_model.load_state_dict(state)
@@ -165,6 +167,12 @@ def main():
         seed=SPLIT_SEED,
         augmentation=False,
     )
+    # train_ds, val_ds, test_ds, y_train, y_val, y_test = make_cached_spectrogram_datasets(
+    #     ECG_PATH,
+    #     LABELS_PATH,
+    #     cache_fraction=SUBSET_FRACTION,
+    #     seed=SPLIT_SEED,
+    # )
     print(f"Train: {len(train_ds)} | Val: {len(val_ds)} | Test: {len(test_ds)}")
     print(f"Pozytywnych w train: {int(y_train.sum())} / {len(y_train)}")
     print(f"Pozytywnych w test:  {int(y_test.sum())} / {len(y_test)}\n")
