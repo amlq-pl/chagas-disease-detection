@@ -119,7 +119,7 @@ if __name__ == "__main__":
     SUBSET_FRACTION = 1.0
     EARLY_STOPPING_PATIENCE = 5
     DIRPATH = "processed-data"
-    FILEPATH = DIRPATH + "/" + "ecg_merged_100hz_resampled.npy"
+    FILEPATH = DIRPATH + "/" + "ecg_merged_100hz.npy"
     LABELS = DIRPATH + "/" + "labels_merged.npy"
     METADATA = DIRPATH + "/" + "metadata_merged.npy"
     CHECKPOINT = "best_resnet1d.pt"
