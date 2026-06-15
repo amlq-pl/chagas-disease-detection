@@ -24,5 +24,31 @@ wzorców zarówno w osi czasu, jak i w osi częstotliwości, co jest trudniejsze
 do osiągnięcia przy pozostałych modelach.
 
 
+\subsection*{Trening i wyniki}
+Trening został na danych z 11 na 17 plików wejściowych zbioru CODE-15\% oraz całym zbiorze SaMi-Trop z podziałem 70\%/15\%/15\%.
+Wytrenowaliśmy ensemble modeli ResNet2D, a wyniki
+poszczególnych modeli zespołu można zobaczyć w Tabeli \ref{tab:resnet2d_results}.
 
+\begin{table}[H]
+  \centering
+  \begin{tabular}{lrrrrl}
+    \toprule
+    name & best\_val\_auprc & test\_auroc & test\_auprc & test\_acc & duration \\
+    \midrule
+    seed\_42 & 0.140 & 0.778 & 0.130 & 0.880 & 34 min 41 s \\
+    seed\_43 & 0.140 & 0.778 & 0.126 & 0.660 & 37 min 25 s \\
+    seed\_44 & 0.141 & 0.782 & 0.135 & 0.735 & 27 min 12 s \\
+    \bottomrule
+  \end{tabular}
+  \caption{Wyniki treningu i testu dla poszczególnych seedów sieci ResNet2D na spektrogramach.}
+  \label{tab:resnet2d_results}
+\end{table}
+Na wykresie \ref{fig:resnet2d_learning_curves} przedstawiono krzywe uczenia (AUPRC na zbiorze
+walidacyjnym) dla poszczególnych seedów.
 
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=0.8\textwidth]{Spektrogram_ResNet2D/val_auprc_per_seed.png}
+  \caption{Krzywe uczenia (AUPRC na zbiorze walidacyjnym) dla poszczególnych seedów sieci ResNet2D.}
+  \label{fig:resnet2d_learning_curves}
+\end{figure}
