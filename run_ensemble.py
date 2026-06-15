@@ -74,7 +74,7 @@ def train_one_seed(seed, train_ds, val_ds, test_ds, y_train, run_dir):
     )
 
     model = InceptionNetwork(in_channels=12, use_meta=False).to(device)
-    # model = ResNet18(use_meta=False).to(device)
+    # model = ResNet18().to(device)
     compiled_model = torch.compile(model)
 
     n_pos = int(y_train.sum())
@@ -133,7 +133,7 @@ def collect_test_probs(checkpoint_path, test_ds):
     )
 
     model = InceptionNetwork(in_channels=12, use_meta=False).to(device)
-    # model = ResNet18(use_meta=False).to(device)
+    # model = ResNet18().to(device)
     compiled_model = torch.compile(model)
     state = torch.load(checkpoint_path, map_location=device)
     compiled_model.load_state_dict(state)

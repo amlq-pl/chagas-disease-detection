@@ -13,20 +13,16 @@ class SmallResidualBlock(torch.nn.Module):
         self.stride = stride
 
         self.conv1 = torch.nn.Conv2d(
-            in_channels=self.in_channels,
-            out_channels=self.out_channels,
+            in_channels,
+            out_channels,
             kernel_size=3,
             padding=1,
-            stride=self.stride,
+            stride=stride,
             bias=False,
         )
         self.bn1 = torch.nn.BatchNorm2d(self.out_channels)
         self.conv2 = torch.nn.Conv2d(
-            in_channels=out_channels,
-            out_channels=out_channels,
-            kernel_size=3,
-            padding=1,
-            bias=False,
+            out_channels, out_channels, kernel_size=3, padding=1, bias=False
         )
         self.bn2 = torch.nn.BatchNorm2d(self.out_channels)
 
@@ -49,12 +45,10 @@ class SmallResidualBlock(torch.nn.Module):
 
 
 class ResNet18(torch.nn.Module):
-    def __init__(self, use_meta=False, meta_dim=3):
+    def __init__(self):
         super().__init__()
         self.ecg_channels = 12
         self.input_channels = 64
-        self.use_meta = use_meta
-        self.meta_dim = meta_dim if use_meta else 0
 
         self.conv_pre = torch.nn.Conv2d(12, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bne_pre = torch.nn.BatchNorm2d(self.input_channels)
@@ -65,11 +59,11 @@ class ResNet18(torch.nn.Module):
         self.layer4 = self._layer(in_channels=256, out_channels=512, stride=2, num_blocks=2)
 
         self.pool = torch.nn.AdaptiveAvgPool2d(1)
-        self.fc = torch.nn.Linear(512 + self.meta_dim, 1)
+        self.fc = torch.nn.Linear(512, 1)
         self.relu = torch.nn.ReLU()
         self.maxpool = torch.nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
-    def forward(self, input: torch.Tensor, meta: torch.Tensor):
+    def forward(self, input: torch.Tensor, meta: torch.Tensor = None):
         out = self.conv_pre(input)
         out = self.bne_pre(out)
         out = self.relu(out)
@@ -81,8 +75,6 @@ class ResNet18(torch.nn.Module):
         out = self.pool(out)
 
         out = torch.flatten(out, 1)
-        if self.use_meta:
-            out = torch.cat([out, meta], dim=1)
         out = self.fc(out)
 
         return out
